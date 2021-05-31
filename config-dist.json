@@ -1,0 +1,16 @@
+{
+  "YoutubeAccountId": "",
+  "DiscordBotToken": "",
+  "YoutubeAPIKey": "",
+  "YoutubeClientId": "",
+  "YoutubeClientSecret": "",
+  "YoutubeDeviceId":"",
+  "YoutubeRefreshToken": "",
+  "ChannelIdTvTime": 0,
+  "ChannelIdDev":0,
+  "MSSqlUser": "",
+  "MSSqlPassword": "",
+  "MSSqlServer": "",
+  "MSSqlServerDB": "",
+  "_comment": "Fill in API Keys and rename to config.json"
+}
