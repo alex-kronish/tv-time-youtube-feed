@@ -14,17 +14,24 @@ def refreshYoutubeToken(config):
         "grant_type": "refresh_token",
         "refresh_token": config["YoutubeRefreshToken"]
     }
-    req = requests.post(refresh_url, refresh_payload)
-    print(req.status_code)
-    if req.status_code != 200:
-        AppLog.error("Couldn't authenticate with the Youtube API to refresh the token. HTTP status code was " + str(
-            req.status_code))
+    try:
+        req = requests.post(refresh_url, refresh_payload)
+    except requests.RequestException as e:
+        AppLog.error(str(e))
+        AppLog.error("We got an exception using the requests library. Is the internet offline? Damn you cablevision!")
         AppLog.error("Shutting the bot down due to a fatal error.")
         exit(0)
-    resp = req.json()
-    access_token = resp["access_token"]
-    print(access_token)
-    return access_token
+    else:
+        print(req.status_code)
+        if req.status_code != 200:
+            AppLog.error("Couldn't authenticate with the Youtube API to refresh the token. HTTP status code was " + str(
+                req.status_code))
+            AppLog.error("Shutting the bot down due to a fatal error.")
+            exit(0)
+        resp = req.json()
+        access_token = resp["access_token"]
+        print(access_token)
+        return access_token
 
 
 def getChannelIds(config, access_token):
@@ -32,36 +39,43 @@ def getChannelIds(config, access_token):
                         'contentDetails&mine=true&maxResults=50&key=' + \
                         config["YoutubeAPIKey"]
     subscriptions_api_auth = {'Authorization': "Bearer " + access_token}
-    req1 = requests.get(subscriptions_url, headers=subscriptions_api_auth)
-    if req1.status_code != 200:
-        AppLog.error("The subscriptions endpoint API call failed. HTTP Status code was " + str(req1.status_code))
+    try:
+        req1 = requests.get(subscriptions_url, headers=subscriptions_api_auth)
+    except requests.RequestException as e:
+        AppLog.error(str(e))
+        AppLog.error("We got an exception using the requests library. Is the internet offline? Damn you cablevision!")
         AppLog.error("Shutting the bot down due to a fatal error.")
         exit(0)
-    resp1 = req1.json()
-    all_responses = []
-    all_responses.append(resp1)
-    nextpage = resp1.get("nextPageToken")
-    request_counter = 1
-    while nextpage is not None:
-        print("Total is greater than page total, we need to go deeper")
-        subscriptiions_url_paged = subscriptions_url + "&pageToken=" + nextpage
-        req2 = requests.get(subscriptiions_url_paged, headers=subscriptions_api_auth)
-        resp2 = req2.json()
-        request_counter = request_counter + 1
-        all_responses.append(resp2)
-        nextpage = resp2.get("nextPageToken")
-    AppLog.info("Made " + str(request_counter) + " API calls to the Subscriptions endpoint")
-    channel_ids = []
-    # print(all_responses)
-    for x in all_responses:
-        for i in x["items"]:
-            channelid = i["snippet"]["resourceId"]["channelId"]
-            channel_ids.append(channelid)
-    deduplicated_channel_ids = distinctList(channel_ids)
-    AppLog.info(str(len(deduplicated_channel_ids)) + " channels found")
-    # print(json.dumps(channel_ids))
-    failsafe_channel_ids = theYoutubeAPIsucksASS(deduplicated_channel_ids)
-    return failsafe_channel_ids
+    else:
+        if req1.status_code != 200:
+            AppLog.error("The subscriptions endpoint API call failed. HTTP Status code was " + str(req1.status_code))
+            AppLog.error("Shutting the bot down due to a fatal error.")
+            exit(0)
+        resp1 = req1.json()
+        all_responses = []
+        all_responses.append(resp1)
+        nextpage = resp1.get("nextPageToken")
+        request_counter = 1
+        while nextpage is not None:
+            print("Total is greater than page total, we need to go deeper")
+            subscriptiions_url_paged = subscriptions_url + "&pageToken=" + nextpage
+            req2 = requests.get(subscriptiions_url_paged, headers=subscriptions_api_auth)
+            resp2 = req2.json()
+            request_counter = request_counter + 1
+            all_responses.append(resp2)
+            nextpage = resp2.get("nextPageToken")
+        AppLog.info("Made " + str(request_counter) + " API calls to the Subscriptions endpoint")
+        channel_ids = []
+        # print(all_responses)
+        for x in all_responses:
+            for i in x["items"]:
+                channelid = i["snippet"]["resourceId"]["channelId"]
+                channel_ids.append(channelid)
+        deduplicated_channel_ids = distinctList(channel_ids)
+        AppLog.info(str(len(deduplicated_channel_ids)) + " channels found")
+        # print(json.dumps(channel_ids))
+        failsafe_channel_ids = theYoutubeAPIsucksASS(deduplicated_channel_ids)
+        return failsafe_channel_ids
 
 
 def getChannelUploads(config, channel_ids, access_token):
@@ -73,15 +87,23 @@ def getChannelUploads(config, channel_ids, access_token):
         api_auth = {'Authorization': "Bearer " + access_token}
         url = "https://www.googleapis.com/youtube/v3/channels?part=snippet,contentDetails&" \
               "maxResults=50&key=" + config["YoutubeAPIKey"] + "&id=" + channel_ids_str
-        req = requests.get(url, headers=api_auth)
-        st = req.status_code
-        if st != 200:
-            AppLog.error("The channels API call failed. HTTP Status code was " + str(st))
+        try:
+            req = requests.get(url, headers=api_auth)
+        except requests.RequestException as e:
+            AppLog.error(str(e))
+            AppLog.error(
+                "We got an exception using the requests library. Is the internet offline? Damn you cablevision!")
             AppLog.error("Shutting the bot down due to a fatal error.")
             exit(0)
-        resp = req.json()
-        all_responses.append(resp)
-        request_counter = request_counter + 1
+        else:
+            st = req.status_code
+            if st != 200:
+                AppLog.error("The channels API call failed. HTTP Status code was " + str(st))
+                AppLog.error("Shutting the bot down due to a fatal error.")
+                exit(0)
+            resp = req.json()
+            all_responses.append(resp)
+            request_counter = request_counter + 1
     playlist_ids = []
     AppLog.info("Made " + str(request_counter) + " calls to the Channels API")
     for x in all_responses:
@@ -104,40 +126,49 @@ def getVideosList(uploads_playlists, access_token, eligible):
     videos = []
     for p in uploads_playlists:
         playlisturl = url + p
-        req = requests.get(playlisturl, headers=api_auth)
-        resp = req.json()
-        if req.status_code == 200:
-            for i in resp["items"]:
-                video_title = i["snippet"]["title"]
-                video_from = i["snippet"]["channelTitle"]
-                video_id = i["contentDetails"]["videoId"]
-                d = {"channel": video_from, "title": video_title, "id": video_id,
-                     "channel_id": i["snippet"]["channelId"]}
-                ignore = False
-                patterns = [r'(?i)giant bombcast',
-                            r'(?i)giant beastcast',
-                            r'(?i)wan show',
-                            r'(?i)mega64 podcast',
-                            r'(?i)we be drummin']
-                chid = i["snippet"]["channelId"]
-                for px in patterns:
-                    if re.search(px, video_title):
-                        AppLog.info("ignoring " + video_id + " | " + video_title + " | Reason: Regex exclusion list",
-                                    video_id, video_title, chid, video_from)
-                        ignore = True
-                if i["snippet"]["channelId"] not in eligible:
-                    print(
-                        "ignoring " + video_id + " | " + chid + " | " + video_title + " | Reason: Channel not in prev subs txt file, new subscription?",
-                        video_id, video_title, chid, video_from)
-                    ignore = True
-                z = {"title": d["title"], "channel": d["channel"], "id": d["id"], "ignore": ignore,
-                     "channel_id": d["channel_id"]}
-                videos.append(z)
+        try:
+            req = requests.get(playlisturl, headers=api_auth)
+        except requests.RequestException as e:
+            AppLog.error(str(e))
+            AppLog.error(
+                "We got an exception using the requests library. Is the internet offline? Damn you cablevision!")
+            AppLog.error("Shutting the bot down due to a fatal error.")
+            exit(0)
         else:
-            st = req.status_code
-            AppLog.error("The playlists API call failed. HTTP Status code was " + str(st) +
-                         " and the playlist_id was " + p)
-            AppLog.warn("The bot continues out of spite.")
+            resp = req.json()
+            if req.status_code == 200:
+                for i in resp["items"]:
+                    video_title = i["snippet"]["title"]
+                    video_from = i["snippet"]["channelTitle"]
+                    video_id = i["contentDetails"]["videoId"]
+                    d = {"channel": video_from, "title": video_title, "id": video_id,
+                         "channel_id": i["snippet"]["channelId"]}
+                    ignore = False
+                    patterns = [r'(?i)giant bombcast',
+                                r'(?i)giant beastcast',
+                                r'(?i)wan show',
+                                r'(?i)mega64 podcast',
+                                r'(?i)we be drummin']
+                    chid = i["snippet"]["channelId"]
+                    for px in patterns:
+                        if re.search(px, video_title):
+                            AppLog.info(
+                                "ignoring " + video_id + " | " + video_title + " | Reason: Regex exclusion list",
+                                video_id, video_title, chid, video_from)
+                            ignore = True
+                    if i["snippet"]["channelId"] not in eligible:
+                        print(
+                            "ignoring " + video_id + " | " + chid + " | " + video_title + " | Reason: Channel not in prev subs txt file, new subscription?",
+                            video_id, video_title, chid, video_from)
+                        ignore = True
+                    z = {"title": d["title"], "channel": d["channel"], "id": d["id"], "ignore": ignore,
+                         "channel_id": d["channel_id"]}
+                    videos.append(z)
+            else:
+                st = req.status_code
+                AppLog.error("The playlists API call failed. HTTP Status code was " + str(st) +
+                             " and the playlist_id was " + p)
+                AppLog.warn("The bot continues out of spite.")
     return videos
 
 
@@ -237,6 +268,9 @@ def theYoutubeAPIsucksASS(channel_ids_api):
     channel_ids_textfile = getLocalChannelsList()
     AppLog.info("Checking channels.txt because the youtube api is a bit like a candle in the wind.... unreliable.")
     AppLog.info("channels.txt = " + str(len(channel_ids_textfile)))
+    for c in channel_ids_textfile:
+        if c not in channel_ids_api:
+            AppLog.info("The following channel ID was not in the API result | " + c, channel_id=c)
     for c in channel_ids_api:
         if c not in channel_ids_textfile:
             channel_ids_textfile.append(c)

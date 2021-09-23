@@ -13,9 +13,11 @@ class AppLogger:
         self.instanceId = str(uuid.uuid4()).upper()
         self.connection_string = 'DRIVER={ODBC Driver 17 for SQL Server};' \
                                  'SERVER=' + self.dbconfig["MSSqlServer"] + ';' \
-                                 'DATABASE=' + self.dbconfig["MSSqlServerDB"] + ';' \
-                                 'UID=' + self.dbconfig["MSSqlUser"] + ';' \
-                                 'PWD=' + self.dbconfig["MSSqlPassword"]
+                                                                            'DATABASE=' + self.dbconfig[
+                                     "MSSqlServerDB"] + ';' \
+                                                        'UID=' + self.dbconfig["MSSqlUser"] + ';' \
+                                                                                              'PWD=' + self.dbconfig[
+                                     "MSSqlPassword"]
         pass
 
     def log_event(self, severity, message, video_id, video_name, channel_id, channel_name):
